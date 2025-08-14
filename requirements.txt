@@ -1,0 +1,29 @@
+# Core web framework
+Flask==3.0.0
+Flask-SocketIO==5.3.6
+
+# PyTorch with CUDA support (for RTX 4080 with CUDA 12.6)
+# Install PyTorch with CUDA using: pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+torch>=2.5.0
+torchvision>=0.20.0
+torchaudio>=2.5.0
+
+# Scientific computing
+numpy>=1.21.0
+scipy>=1.7.0
+
+# Image processing
+Pillow>=9.0.0
+opencv-python>=4.5.0
+
+# System monitoring and automation
+psutil>=5.8.0
+pyautogui>=0.9.53
+pynput>=1.7.0
+
+# Data handling
+pandas>=1.3.0
+
+# Additional utilities
+requests>=2.25.0
+python-socketio>=5.0.0 

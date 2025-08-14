@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Engine Metrics</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f4f4; padding: 20px; }
+        .chart-container { max-width: 900px; margin: auto; }
+        .nav-bar {
+            background-color: #f0f0f0;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ccc;
+        }
+        .nav-bar a {
+            margin-right: 15px;
+            text-decoration: none;
+            color: #333;
+            padding: 5px 10px;
+            border-radius: 3px;
+        }
+        .nav-bar a:hover {
+            background-color: #ddd;
+        }
+        .nav-bar a.active {
+            background-color: #007bff;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="nav-bar">
+        <a href="/">Engine Control</a>
+        <a href="/metrics" class="active">Metrics</a>
+        <a href="/hashes">Hashes</a>
+        <a href="/monitor">Monitor</a>
+        <a href="/interactive">Interactive</a>
+        <a href="/stats">Stats</a>
+    </div>
+    <h1>Live Engine Metrics</h1>
+    <div class="chart-container">
+        <canvas id="tpsChart"></canvas>
+    </div>
+    <script src="{{ url_for('static', filename='metrics.js') }}"></script>
+</body>
+</html> 

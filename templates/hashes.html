@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hash Memory Visualizer</title>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f4f4; color: #333; }
+        .page-container { max-width: 1200px; margin: auto; padding: 20px; }
+        .hash-grid { display: flex; gap: 20px; }
+        .hash-group { flex: 1; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .hash-group h2 { padding: 15px; margin: 0; border-bottom: 1px solid #eee; }
+        .hashes-container { padding: 15px; height: 60vh; overflow-y: auto; }
+        .hash-card { background-color: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 10px; margin-bottom: 10px; font-family: monospace; font-size: 12px; }
+        .hash-card p { margin: 0 0 5px 0; }
+        .hash-id { font-weight: bold; color: #0056b3; }
+        .nav-bar {
+            background-color: #f0f0f0;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ccc;
+        }
+        .nav-bar a {
+            margin-right: 15px;
+            text-decoration: none;
+            color: #333;
+            padding: 5px 10px;
+            border-radius: 3px;
+        }
+        .nav-bar a:hover {
+            background-color: #ddd;
+        }
+        .nav-bar a.active {
+            background-color: #007bff;
+            color: white;
+        }
+    </style>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="nav-bar">
+        <a href="/">Engine Control</a>
+        <a href="/metrics">Metrics</a>
+        <a href="/hashes" class="active">Hashes</a>
+        <a href="/monitor">Monitor</a>
+        <a href="/interactive">Interactive</a>
+        <a href="/stats">Stats</a>
+    </div>
+    <div class="page-container">
+        <h1>Hash Memory Visualizer</h1>
+
+        <div class="hash-grid">
+            <div class="hash-group">
+                <h2>Master Hashes (Long-Term Memory)</h2>
+                <div id="master-hashes-container" class="hashes-container">
+                    <p>Waiting for data from engine...</p>
+                </div>
+            </div>
+            <div class="hash-group">
+                <h2>Novel Hashes (Active Learning)</h2>
+                <div id="novel-hashes-container" class="hashes-container">
+                    <p>Waiting for data from engine...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='hashes.js') }}"></script>
+</body>
+</html> 

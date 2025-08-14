@@ -1,0 +1,173 @@
+/* Navigation Arrows */
+.nav-arrows {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.nav-arrow {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 50px;
+    height: 50px;
+    background-color: rgba(30, 41, 59, 0.9);
+    border: 2px solid #67e8f9;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    pointer-events: auto;
+    z-index: 1001;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.nav-arrow:hover {
+    background-color: rgba(103, 232, 249, 0.2);
+    border-color: #67e8f9;
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 0 6px 20px rgba(103, 232, 249, 0.3);
+}
+
+.nav-arrow:active {
+    transform: translateY(-50%) scale(0.95);
+}
+
+.nav-arrow.prev {
+    left: 20px;
+}
+
+.nav-arrow.next {
+    right: 20px;
+}
+
+.nav-arrow svg {
+    width: 24px;
+    height: 24px;
+    fill: #67e8f9;
+    transition: fill 0.3s ease;
+}
+
+.nav-arrow:hover svg {
+    fill: #ffffff;
+}
+
+/* Arrow tooltips */
+.nav-arrow::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(30, 41, 59, 0.95);
+    color: #d4d4d4;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    border: 1px solid #334155;
+    backdrop-filter: blur(10px);
+}
+
+.nav-arrow::after {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid rgba(30, 41, 59, 0.95);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.nav-arrow:hover::before,
+.nav-arrow:hover::after {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .nav-arrow {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .nav-arrow svg {
+        width: 20px;
+        height: 20px;
+    }
+    
+    .nav-arrow.prev {
+        left: 10px;
+    }
+    
+    .nav-arrow.next {
+        right: 10px;
+    }
+    
+    .nav-arrow::before {
+        font-size: 0.75rem;
+        padding: 6px 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .nav-arrow {
+        width: 35px;
+        height: 35px;
+    }
+    
+    .nav-arrow svg {
+        width: 18px;
+        height: 18px;
+    }
+    
+    .nav-arrow.prev {
+        left: 5px;
+    }
+    
+    .nav-arrow.next {
+        right: 5px;
+    }
+}
+
+/* Keyboard navigation indicator */
+.nav-arrow.keyboard-nav {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    50% {
+        box-shadow: 0 4px 12px rgba(103, 232, 249, 0.5);
+    }
+}
+
+/* Disabled state */
+.nav-arrow.disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.nav-arrow.disabled:hover {
+    background-color: rgba(30, 41, 59, 0.9);
+    border-color: #67e8f9;
+    transform: translateY(-50%) scale(1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+} 

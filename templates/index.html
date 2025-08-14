@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Engine Control - Barebones</title>
+    <!-- 1. Load the required Socket.IO library -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <style>
+        .nav-bar {
+            background-color: #f0f0f0;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ccc;
+        }
+        .nav-bar a {
+            margin-right: 15px;
+            text-decoration: none;
+            color: #333;
+            padding: 5px 10px;
+            border-radius: 3px;
+        }
+        .nav-bar a:hover {
+            background-color: #ddd;
+        }
+        .nav-bar a.active {
+            background-color: #007bff;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="nav-bar">
+        <a href="/" class="active">Engine Control</a>
+        <a href="/metrics">Metrics</a>
+        <a href="/hashes">Hashes</a>
+        <a href="/monitor">Monitor</a>
+    </div>
+
+    <h1>Engine Control</h1>
+    <button id="start-stop-button">Start Engine</button>
+    <button id="wipe-button">Wipe System Data</button>
+    <hr>
+
+    <h2>Live Status</h2>
+    <pre id="status-display">Engine is OFFLINE.</pre>
+    <pre id="tokens-display">Active Tokens: 0</pre>
+    <pre id="energy-display">Energy: 0.0</pre>
+    <hr>
+
+    <h2>Lifetime Stats</h2>
+    <div id="lifetime-stats-display" style="font-family: monospace;">
+        <p>Total Ticks Ever: <span id="total-ticks">0</span></p>
+        <p>Total Runtime (Hours): <span id="total-runtime">0.0</span></p>
+        <p>Session Count: <span id="session-count">0</span></p>
+    </div>
+    <hr>
+
+    <h2>System Log</h2>
+    <pre id="system-log-display" style="height: 200px; overflow-y: scroll; border: 1px solid #ccc;"></pre>
+    
+    <h2>Error Log</h2>
+    <pre id="error-log-display" style="height: 200px; overflow-y: scroll; border: 1px solid #ccc; background-color: #fff0f0;"></pre>
+
+    <!-- 2. Load our custom JavaScript that will connect to the engine -->
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+
+</body>
+</html> 

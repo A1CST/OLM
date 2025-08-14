@@ -1,0 +1,216 @@
+/* --- General Body & Font Styling --- */
+body {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+}
+
+h1, h2 {
+    color: #569cd6;
+    border-bottom: 1px solid #444;
+    padding-bottom: 5px;
+    font-weight: 400;
+}
+
+/* --- Header Section Styling --- */
+#header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #3e3e42;
+}
+
+#header-section h1 {
+    margin: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+/* --- Navigation Bar Styling --- */
+#navigation-bar {
+    display: flex;
+    gap: 10px;
+}
+
+.nav-button {
+    background-color: #2d2d30;
+    color: #d4d4d4;
+    border: 1px solid #3e3e42;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.2s ease;
+}
+
+.nav-button:hover {
+    background-color: #569cd6;
+    color: white;
+    border-color: #569cd6;
+}
+
+.nav-button.active {
+    background-color: #569cd6;
+    color: white;
+    border-color: #569cd6;
+}
+
+/* --- Main Grid Layout --- */
+#main-grid {
+    display: grid;
+    /* Define a 3-column layout. The middle column is twice as wide. */
+    grid-template-columns: 1fr 2fr 1fr;
+    /* Define rows for different sections - give more space to the bottom row */
+    grid-template-rows: auto auto 300px;
+    grid-gap: 20px; /* Spacing between panels */
+    height: calc(100vh - 100px); /* Fill the vertical space */
+    
+    /* Assign names to grid areas for easy placement */
+    grid-template-areas:
+        "status-panel   model-output-panel   roi-preview-panel"
+        "controls-panel sensory-data-panel   realtime-preview-panel"
+        "system-log-panel system-log-panel   error-log-panel";
+}
+
+/* --- General Panel Styling --- */
+#main-grid > div {
+    background-color: #252526;
+    border: 1px solid #3e3e42;
+    border-radius: 8px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Prevents content from spilling out */
+    min-height: 0; /* Allow panels to shrink */
+}
+
+/* --- Assign Panels to Grid Areas --- */
+#status-panel         { grid-area: status-panel; }
+#model-output-panel   { grid-area: model-output-panel; }
+#roi-preview-panel    { grid-area: roi-preview-panel; }
+#realtime-preview-panel { grid-area: realtime-preview-panel; }
+#controls-panel       { grid-area: controls-panel; }
+#sensory-data-panel   { grid-area: sensory-data-panel; }
+#system-log-panel     { grid-area: system-log-panel; }
+#error-log-panel      { grid-area: error-log-panel; }
+/* Text input panel removed - moved to interactive page */
+
+
+/* --- Log Panel Styling --- */
+.log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.log-header h2 {
+    margin: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.pause-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.9em;
+    color: #d4d4d4;
+    cursor: pointer;
+}
+
+.pause-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #569cd6;
+}
+
+.log-container {
+    height: 250px; /* Increased height for log containers */
+    overflow: hidden;
+    border: 1px solid #333;
+    border-radius: 4px;
+    background-color: #1e1e1e;
+    flex-grow: 1; /* Allow container to expand */
+}
+
+/* --- Specific Panel Content Styling --- */
+pre {
+    background-color: #1e1e1e;
+    border: none;
+    padding: 10px;
+    font-family: "Consolas", "Monaco", monospace;
+    font-size: 0.9em;
+    white-space: pre-wrap; /* Wrap long lines */
+    word-wrap: break-word;
+    height: 100%;
+    overflow-y: auto; /* Add scrollbar if content overflows */
+    overflow-x: auto; /* Add horizontal scrollbar if needed */
+    margin: 0;
+    box-sizing: border-box;
+}
+
+#status-panel p, #controls-panel p {
+    margin: 5px 0;
+}
+
+/* --- Button and Input Styling --- */
+button {
+    background-color: #569cd6;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+    margin-right: 8px;
+}
+
+button:hover {
+    background-color: #408ac9;
+}
+
+/* Smaller controls panel buttons */
+#controls-panel button {
+    padding: 6px 8px;
+    font-size: 0.75em;
+    margin-right: 6px;
+    width: auto;
+    min-width: 60px;
+    max-width: 80px;
+}
+
+#wipe-model-button {
+    background-color: #c54343;
+}
+#wipe-model-button:hover {
+    background-color: #b03535;
+}
+
+input[type="text"] {
+    background-color: #3e3e42;
+    border: 1px solid #555;
+    color: #d4d4d4;
+    padding: 6px 10px;
+    border-radius: 4px;
+    width: 60%;
+    font-size: 0.9em;
+}
+
+/* --- Error Log Panel Styling --- */
+#error-log-panel {
+    border-color: #c54343; /* Red border to indicate errors */
+}
+
+#error-log-panel h2 {
+    color: #ff6b6b; /* Red header for error panel */
+}
+
+#error-log-content {
+    color: #ff8a8a; /* Lighter red text for error content */
+} 

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OLM Stats - System Analytics</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='stats.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='navigation.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div id="header-section">
+        <h1>OLM System Statistics</h1>
+        <nav id="navigation-bar">
+            <button class="nav-button" onclick="window.location.href='/'">Main</button>
+            <button class="nav-button" onclick="window.location.href='/hashes'">Hashes</button>
+            <button class="nav-button" onclick="window.location.href='/monitor'">Monitor</button>
+            <button class="nav-button" onclick="window.location.href='/interactive'">Interactive</button>
+            <button class="nav-button" id="compression-button">Compression</button>
+            <button class="nav-button active" onclick="window.location.href='/stats'">Stats</button>
+        </nav>
+    </div>
+
+    <div class="stats-container">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl sm:text-4xl font-bold text-cyan-300">OLM System Analytics</h1>
+            <p class="text-slate-400 mt-2">Real-time system performance metrics and historical data visualization.</p>
+        </header>
+
+        <div class="stats-controls">
+            <div class="time-range-selector">
+                <label for="time-range">Time Range:</label>
+                <select id="time-range">
+                    <option value="1h">Last Hour</option>
+                    <option value="6h" selected>Last 6 Hours</option>
+                    <option value="24h">Last 24 Hours</option>
+                    <option value="7d">Last 7 Days</option>
+                    <option value="30d">Last 30 Days</option>
+                </select>
+            </div>
+            <div class="refresh-controls">
+                <button id="refresh-btn" class="refresh-button">Refresh Data</button>
+                <label class="auto-refresh-label">
+                    <input type="checkbox" id="auto-refresh" checked> Auto-refresh
+                </label>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-panel">
+                <h2>Energy Consumption</h2>
+                <div class="chart-container">
+                    <canvas id="energyChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-panel">
+                <h2>Processing Speed (TPS)</h2>
+                <div class="chart-container">
+                    <canvas id="tpsChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-panel">
+                <h2>Memory Usage</h2>
+                <div class="chart-container">
+                    <canvas id="memoryChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-panel">
+                <h2>Hash Collision Rate</h2>
+                <div class="chart-container">
+                    <canvas id="collisionChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-panel">
+                <h2>Response Time</h2>
+                <div class="chart-container">
+                    <canvas id="responseChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-panel">
+                <h2>System Load</h2>
+                <div class="chart-container">
+                    <canvas id="loadChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="summary-panel">
+            <h2>Performance Summary</h2>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="summary-label">Average Energy</div>
+                    <div class="summary-value" id="avg-energy">87.3%</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Peak TPS</div>
+                    <div class="summary-value" id="peak-tps">156.7</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Memory Efficiency</div>
+                    <div class="summary-value" id="memory-efficiency">94.2%</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Avg Response Time</div>
+                    <div class="summary-value" id="avg-response">142ms</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">System Uptime</div>
+                    <div class="summary-value" id="uptime">99.7%</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-label">Error Rate</div>
+                    <div class="summary-value" id="error-rate">0.3%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='stats.js') }}"></script>
+    <script src="{{ url_for('static', filename='navigation.js') }}"></script>
+</body>
+</html> 

@@ -356,20 +356,62 @@ class SystemBenchmark:
         Args:
             duration (float): Duration in seconds to monitor (None for indefinite)
         """
+        baseline_duration = getattr(self, 'baseline_duration', 10)
+        
+        # Collect baseline measurements before starting engine
+        if self.start_engine:
+            print(f"[BASELINE] Collecting baseline measurements for {baseline_duration} seconds...")
+            print("   - This establishes performance before engine starts")
+            
+            # Start baseline monitoring
+            self.running = True
+            self.start_time = time.time()
+            baseline_end = self.start_time + baseline_duration
+            baseline_samples = 0
+            
+            # Collect baseline data
+            try:
+                while time.time() < baseline_end and self.running:
+                    cycle_start = time.time()
+                    self._collect_all_metrics()
+                    baseline_samples += 1
+                    
+                    # Maintain sampling interval
+                    cycle_time = time.time() - cycle_start
+                    sleep_time = max(0, self.interval - cycle_time)
+                    if sleep_time > 0:
+                        time.sleep(sleep_time)
+                        
+            except KeyboardInterrupt:
+                print("\n[STOP] Baseline collection stopped by user")
+                self.running = False
+                return self._generate_summary()
+            
+            # Show baseline summary
+            self._print_baseline_summary(baseline_samples)
+        
         # Start OLM engine if requested
         engine_started = False
         if self.start_engine:
             engine_started = self._start_olm_engine()
             if not engine_started:
                 print("[WARNING] Continuing benchmark without engine...")
+                # Reset for monitoring without engine
+                self.running = True
+                self.start_time = time.time()
             else:
                 # Give engine time to warm up and start processing
                 warmup_time = getattr(self, 'warmup_time', 5)
                 print(f"[ENGINE] Warming up for {warmup_time} seconds...")
                 time.sleep(warmup_time)
+                
+                # Reset timer for main monitoring phase
+                self.start_time = time.time()
+        else:
+            # No engine start, just begin monitoring
+            self.running = True
+            self.start_time = time.time()
         
-        self.running = True
-        self.start_time = time.time()
         end_time = self.start_time + duration if duration else None
         
         print(f"[START] Starting benchmark monitoring...")
@@ -435,6 +477,37 @@ class SystemBenchmark:
             status += f" | GPU: {gpu_util:.1f}%"
         
         print(status)
+    
+    def _print_baseline_summary(self, baseline_samples):
+        """Print summary of baseline measurements before engine starts."""
+        if not self.data['cpu_percent'] or len(self.data['cpu_percent']) < baseline_samples:
+            print("[WARNING] Insufficient baseline data collected")
+            return
+            
+        # Calculate baseline averages
+        cpu_baseline = list(self.data['cpu_percent'])[-baseline_samples:]
+        ram_baseline = list(self.data['ram_percent'])[-baseline_samples:]
+        
+        baseline_cpu_avg = sum(cpu_baseline) / len(cpu_baseline)
+        baseline_ram_avg = sum(ram_baseline) / len(ram_baseline)
+        
+        print(f"\n[BASELINE] System performance before engine:")
+        print(f"   - CPU Usage:  {baseline_cpu_avg:5.1f}% average")
+        print(f"   - RAM Usage:  {baseline_ram_avg:5.1f}% average")
+        
+        if self.gpu_available and len(self.data.get('gpu_0_utilization', [])) >= baseline_samples:
+            gpu_baseline = list(self.data['gpu_0_utilization'])[-baseline_samples:]
+            baseline_gpu_avg = sum(gpu_baseline) / len(gpu_baseline)
+            print(f"   - GPU Usage:  {baseline_gpu_avg:5.1f}% average")
+        
+        # Store baseline for comparison
+        self.baseline_stats = {
+            'cpu_avg': baseline_cpu_avg,
+            'ram_avg': baseline_ram_avg,
+            'gpu_avg': sum(list(self.data.get('gpu_0_utilization', []))[-baseline_samples:]) / baseline_samples if self.gpu_available and len(self.data.get('gpu_0_utilization', [])) >= baseline_samples else 0,
+            'samples': baseline_samples
+        }
+        print()
     
     def _generate_summary(self):
         """Generate performance summary statistics."""
@@ -727,6 +800,8 @@ Examples:
                        help='Skip auto-starting the OLM engine (monitor system only)')
     parser.add_argument('--engine-warmup', type=int, default=5,
                        help='Seconds to wait after starting engine before monitoring (default: 5)')
+    parser.add_argument('--baseline-duration', type=int, default=10,
+                       help='Seconds to collect baseline before starting engine (default: 10)')
     
     args = parser.parse_args()
     
@@ -742,6 +817,7 @@ Examples:
     start_engine = not args.no_engine
     benchmark = SystemBenchmark(interval=args.interval, start_engine=start_engine)
     benchmark.warmup_time = args.engine_warmup
+    benchmark.baseline_duration = args.baseline_duration
     
     try:
         summary = benchmark.start_monitoring(duration=args.duration)
@@ -755,25 +831,51 @@ Examples:
         
         # Print summary
         print("\n[SUMMARY] BENCHMARK RESULTS")
-        print("="*30)
+        print("="*50)
         
         perf = summary.get('performance_summary', {})
+        baseline = getattr(benchmark, 'baseline_stats', None)
         
-        if 'cpu_percent' in perf:
-            cpu_stats = perf['cpu_percent']
-            print(f"CPU Usage:     Avg: {cpu_stats['mean']:5.1f}% | Max: {cpu_stats['max']:5.1f}%")
-        
-        if 'ram_percent' in perf:
-            ram_stats = perf['ram_percent']
-            print(f"RAM Usage:     Avg: {ram_stats['mean']:5.1f}% | Max: {ram_stats['max']:5.1f}%")
-        
-        if 'olm_memory_gb' in perf:
-            olm_stats = perf['olm_memory_gb']
-            print(f"OLM Memory:    Avg: {olm_stats['mean']:5.2f}GB | Max: {olm_stats['max']:5.2f}GB")
-        
-        if 'gpu_0_utilization' in perf:
-            gpu_stats = perf['gpu_0_utilization']
-            print(f"GPU Usage:     Avg: {gpu_stats['mean']:5.1f}% | Max: {gpu_stats['max']:5.1f}%")
+        if baseline:
+            print("                   Baseline  |  With Engine  |  Difference")
+            print("-"*50)
+            
+            if 'cpu_percent' in perf:
+                cpu_stats = perf['cpu_percent']
+                cpu_diff = cpu_stats['mean'] - baseline['cpu_avg']
+                print(f"CPU Usage:     {baseline['cpu_avg']:6.1f}%   | {cpu_stats['mean']:7.1f}%   | +{cpu_diff:5.1f}%")
+            
+            if 'ram_percent' in perf:
+                ram_stats = perf['ram_percent']
+                ram_diff = ram_stats['mean'] - baseline['ram_avg']
+                print(f"RAM Usage:     {baseline['ram_avg']:6.1f}%   | {ram_stats['mean']:7.1f}%   | +{ram_diff:5.1f}%")
+            
+            if 'gpu_0_utilization' in perf and baseline['gpu_avg'] > 0:
+                gpu_stats = perf['gpu_0_utilization']
+                gpu_diff = gpu_stats['mean'] - baseline['gpu_avg']
+                print(f"GPU Usage:     {baseline['gpu_avg']:6.1f}%   | {gpu_stats['mean']:7.1f}%   | +{gpu_diff:5.1f}%")
+            
+            if 'olm_memory_gb' in perf:
+                olm_stats = perf['olm_memory_gb']
+                print(f"OLM Memory:    {0:6.2f}GB  | {olm_stats['mean']:7.2f}GB  | +{olm_stats['mean']:5.2f}GB")
+                
+        else:
+            # No baseline, show standard summary
+            if 'cpu_percent' in perf:
+                cpu_stats = perf['cpu_percent']
+                print(f"CPU Usage:     Avg: {cpu_stats['mean']:5.1f}% | Max: {cpu_stats['max']:5.1f}%")
+            
+            if 'ram_percent' in perf:
+                ram_stats = perf['ram_percent']
+                print(f"RAM Usage:     Avg: {ram_stats['mean']:5.1f}% | Max: {ram_stats['max']:5.1f}%")
+            
+            if 'olm_memory_gb' in perf:
+                olm_stats = perf['olm_memory_gb']
+                print(f"OLM Memory:    Avg: {olm_stats['mean']:5.2f}GB | Max: {olm_stats['max']:5.2f}GB")
+            
+            if 'gpu_0_utilization' in perf:
+                gpu_stats = perf['gpu_0_utilization']
+                print(f"GPU Usage:     Avg: {gpu_stats['mean']:5.1f}% | Max: {gpu_stats['max']:5.1f}%")
         
     except Exception as e:
         print(f"[ERROR] Benchmark failed: {e}")

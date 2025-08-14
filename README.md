@@ -317,6 +317,126 @@ growth_rate = 0.1                 # Growth per novelty unit
 3. **Parameter Adjustment**: Dynamic threshold updates
 4. **Data Persistence**: Save critical state information
 
+## 📊 Performance Benchmarking
+
+The OLM system includes a comprehensive benchmarking tool to monitor system performance, resource usage, and optimization opportunities.
+
+### **Benchmark Tool** (`benchmark.py`)
+
+A sophisticated performance monitoring system that tracks:
+
+**System Metrics:**
+- **CPU Usage**: Overall and per-core utilization, frequency scaling
+- **Memory Usage**: System RAM, process-specific allocation, swap usage
+- **GPU Monitoring**: Utilization, memory usage, temperature (NVIDIA GPUs)
+- **CUDA Metrics**: Memory allocation, cache usage, OOM events
+- **I/O Statistics**: Network and disk throughput
+- **Temperature**: System thermal monitoring
+
+**OLM-Specific Tracking:**
+- Process memory consumption for all OLM components
+- Engine performance correlation with resource usage
+- Growth stage impact on system load
+- Neural processing depth vs. resource requirements
+
+### **Running Benchmarks**
+
+**Quick Start:**
+```bash
+# Install benchmark dependencies
+pip install -r benchmark_requirements.txt
+
+# Run standard 5-minute benchmark
+python benchmark.py --duration 300 --plots
+
+# Interactive mode with live updates
+python benchmark.py --interactive
+
+# Use convenience scripts
+./run_benchmark.sh          # Linux/macOS
+run_benchmark.bat          # Windows
+```
+
+**Command Line Options:**
+```bash
+python benchmark.py [options]
+
+Options:
+  --duration SECONDS     Monitoring duration (default: indefinite)
+  --interval SECONDS     Sampling interval (default: 1.0)
+  --output FILENAME      Results JSON file (default: benchmark_results.json)
+  --plots               Generate performance plots
+  --interactive         Live monitoring mode
+```
+
+**Benchmark Modes:**
+1. **Quick Benchmark** (2 minutes): Rapid performance snapshot
+2. **Standard Benchmark** (5 minutes): Comprehensive analysis  
+3. **Extended Benchmark** (10+ minutes): Long-term stability testing
+4. **Interactive Mode**: Real-time monitoring with live statistics
+
+### **Benchmark Output**
+
+**JSON Results File:**
+```json
+{
+  "system_info": {
+    "cpu_count": 16,
+    "total_ram_gb": 32.0,
+    "cuda_devices": [{"name": "RTX 4080", "memory_total_mb": 16384}]
+  },
+  "performance_summary": {
+    "cpu_percent": {"min": 12.5, "max": 89.3, "mean": 45.2},
+    "ram_percent": {"min": 34.1, "max": 67.8, "mean": 52.4},
+    "olm_memory_gb": {"min": 1.2, "max": 3.8, "mean": 2.1}
+  }
+}
+```
+
+**Generated Visualizations:**
+- `cpu_usage.png`: CPU utilization over time (overall + per-core)
+- `memory_usage.png`: System and OLM process memory consumption  
+- `gpu_usage.png`: GPU utilization and memory allocation
+
+**Live Statistics Display:**
+```
+🔥 LIVE OLM SYSTEM PERFORMANCE
+============================================================
+💻 CPU Usage:      45.2%
+🧠 RAM Usage:      16.8GB (52.4%)
+🤖 OLM Memory:     2.134GB
+🎮 GPU Usage:      78.5% | 12.3GB
+⚡ CUDA Memory:    11.247GB
+
+📊 Last Minute Averages:
+   CPU: 43.8% | RAM: 51.2%
+```
+
+### **Performance Analysis**
+
+**Typical Resource Usage:**
+- **Idle State**: ~15-25% CPU, ~1-2GB RAM
+- **Active Learning**: ~45-65% CPU, ~2-4GB RAM  
+- **Heavy Processing**: ~70-90% CPU, ~4-6GB RAM
+- **GPU Acceleration**: ~60-85% GPU, ~8-14GB VRAM
+
+**Optimization Insights:**
+- Monitor GPU utilization for CUDA efficiency
+- Track memory growth patterns for leak detection
+- Analyze CPU spikes during neural processing
+- Correlate performance with growth stage progression
+
+**Benchmark Integration:**
+```bash
+# Run OLM engine and benchmark simultaneously
+python web_server.py &                    # Start OLM in background
+python benchmark.py --duration 600 --plots  # 10-minute benchmark
+
+# Automated testing workflow
+./run_benchmark.sh    # Select benchmark mode
+# Results automatically saved with timestamp
+```
+
 ## 🔧 Advanced Features
 
 ### **Dynamic Depth Selection**

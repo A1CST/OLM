@@ -17,6 +17,7 @@ import threading
 import subprocess
 import sys
 import os
+import queue
 from datetime import datetime, timedelta
 from collections import defaultdict, deque
 import statistics
@@ -34,6 +35,13 @@ try:
 except ImportError:
     TORCH_AVAILABLE = False
     print("Warning: PyTorch not available. CUDA monitoring disabled.")
+
+try:
+    from engine_pytorch import EngineCore
+    ENGINE_AVAILABLE = True
+except ImportError:
+    ENGINE_AVAILABLE = False
+    print("Warning: engine_pytorch not available. Cannot auto-start engine.")
 
 try:
     import matplotlib.pyplot as plt
@@ -58,18 +66,24 @@ class SystemBenchmark:
     - Network and disk I/O
     """
     
-    def __init__(self, interval=1.0, max_history=3600):
+    def __init__(self, interval=1.0, max_history=3600, start_engine=True):
         """
         Initialize benchmark monitoring.
         
         Args:
             interval (float): Sampling interval in seconds
             max_history (int): Maximum number of samples to keep in memory
+            start_engine (bool): Whether to automatically start the OLM engine
         """
         self.interval = interval
         self.max_history = max_history
         self.running = False
         self.start_time = None
+        self.start_engine = start_engine
+        
+        # Engine management
+        self.engine = None
+        self.engine_queue = None
         
         # Data storage
         self.data = defaultdict(lambda: deque(maxlen=max_history))
@@ -79,18 +93,19 @@ class SystemBenchmark:
         self.target_processes = ['python', 'Python']  # Track Python processes
         self.olm_processes = []
         
-        # System info
-        self.system_info = self._get_system_info()
-        
         # GPU detection
         self.gpu_available = GPU_AVAILABLE
         self.cuda_available = TORCH_AVAILABLE and torch.cuda.is_available()
         
-        print(f"🔧 Benchmark initialized:")
+        # System info
+        self.system_info = self._get_system_info()
+        
+        print(f"[INIT] Benchmark initialized:")
         print(f"   - Sampling interval: {interval}s")
         print(f"   - Max history: {max_history} samples")
-        print(f"   - GPU monitoring: {'✅' if self.gpu_available else '❌'}")
-        print(f"   - CUDA monitoring: {'✅' if self.cuda_available else '❌'}")
+        print(f"   - GPU monitoring: {'YES' if self.gpu_available else 'NO'}")
+        print(f"   - CUDA monitoring: {'YES' if self.cuda_available else 'NO'}")
+        print(f"   - Engine auto-start: {'YES' if self.start_engine and ENGINE_AVAILABLE else 'NO'}")
         print(f"   - System: {self.system_info['cpu_count']} CPU cores, {self.system_info['total_ram_gb']:.1f}GB RAM")
     
     def _get_system_info(self):
@@ -130,6 +145,53 @@ class SystemBenchmark:
         
         self.olm_processes = processes
         return len(processes)
+    
+    def _start_olm_engine(self):
+        """Start the OLM engine for benchmarking."""
+        if not ENGINE_AVAILABLE:
+            print("[WARNING] Engine not available. Cannot start OLM engine.")
+            return False
+        
+        if self.engine and self.engine.is_alive():
+            print("[INFO] Engine already running.")
+            return True
+            
+        try:
+            print("[ENGINE] Starting OLM engine...")
+            # Create queue for engine updates (similar to web_server.py)
+            self.engine_queue = queue.Queue(maxsize=5)
+            
+            # Create and start engine
+            self.engine = EngineCore(self.engine_queue)
+            self.engine.start()
+            
+            # Wait a moment for engine to initialize
+            time.sleep(2)
+            
+            if self.engine.is_alive():
+                print("[ENGINE] OLM engine started successfully!")
+                return True
+            else:
+                print("[ERROR] Failed to start OLM engine.")
+                return False
+                
+        except Exception as e:
+            print(f"[ERROR] Exception starting engine: {e}")
+            return False
+    
+    def _stop_olm_engine(self):
+        """Stop the OLM engine."""
+        if self.engine and self.engine.is_alive():
+            print("[ENGINE] Stopping OLM engine...")
+            try:
+                self.engine.stop()
+                # Give it a moment to stop gracefully
+                time.sleep(1)
+                print("[ENGINE] OLM engine stopped.")
+            except Exception as e:
+                print(f"[WARNING] Exception stopping engine: {e}")
+        else:
+            print("[INFO] Engine not running.")
     
     def _collect_cpu_metrics(self):
         """Collect detailed CPU utilization metrics."""
@@ -178,6 +240,18 @@ class SystemBenchmark:
         # Process-specific memory
         olm_memory_total = 0
         olm_process_count = self._find_olm_processes()
+        
+        # Include our own engine if running
+        if self.engine and self.engine.is_alive():
+            try:
+                # Get the actual engine process
+                engine_pid = os.getpid()  # Our process contains the engine thread
+                engine_proc = psutil.Process(engine_pid)
+                memory_info = engine_proc.memory_info()
+                olm_memory_total += memory_info.rss
+                olm_process_count += 1
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
         
         for proc in self.olm_processes:
             try:
@@ -282,12 +356,25 @@ class SystemBenchmark:
         Args:
             duration (float): Duration in seconds to monitor (None for indefinite)
         """
+        # Start OLM engine if requested
+        engine_started = False
+        if self.start_engine:
+            engine_started = self._start_olm_engine()
+            if not engine_started:
+                print("[WARNING] Continuing benchmark without engine...")
+            else:
+                # Give engine time to warm up and start processing
+                warmup_time = getattr(self, 'warmup_time', 5)
+                print(f"[ENGINE] Warming up for {warmup_time} seconds...")
+                time.sleep(warmup_time)
+        
         self.running = True
         self.start_time = time.time()
         end_time = self.start_time + duration if duration else None
         
-        print(f"🚀 Starting benchmark monitoring...")
+        print(f"[START] Starting benchmark monitoring...")
         print(f"   - Duration: {'Indefinite' if duration is None else f'{duration}s'}")
+        print(f"   - Engine running: {'YES' if engine_started else 'NO'}")
         print(f"   - Press Ctrl+C to stop manually\n")
         
         sample_count = 0
@@ -316,11 +403,15 @@ class SystemBenchmark:
                     time.sleep(sleep_time)
                 
         except KeyboardInterrupt:
-            print("\n⏸️ Monitoring stopped by user")
+            print("\n[STOP] Monitoring stopped by user")
         
         self.running = False
         elapsed = time.time() - self.start_time
-        print(f"\n✅ Monitoring completed: {sample_count} samples in {elapsed:.1f}s")
+        print(f"\n[DONE] Monitoring completed: {sample_count} samples in {elapsed:.1f}s")
+        
+        # Stop engine if we started it
+        if self.start_engine:
+            self._stop_olm_engine()
         
         return self._generate_summary()
     
@@ -332,7 +423,7 @@ class SystemBenchmark:
         current_cpu = self.data['cpu_percent'][-1]
         current_ram = self.data['ram_percent'][-1]
         
-        status = f"⏱️  {elapsed/60:.1f}m elapsed | Samples: {sample_count} | "
+        status = f"[TIME] {elapsed/60:.1f}m elapsed | Samples: {sample_count} | "
         status += f"CPU: {current_cpu:.1f}% | RAM: {current_ram:.1f}%"
         
         if self.data.get('olm_memory_gb'):
@@ -401,18 +492,18 @@ class SystemBenchmark:
         with open(filename, 'w') as f:
             json.dump(results, f, indent=2, default=str)
         
-        print(f"📊 Results saved to: {filename}")
+        print(f"[SAVE] Results saved to: {filename}")
         print(f"   - File size: {os.path.getsize(filename) / 1024:.1f} KB")
         return filename
     
     def generate_plots(self, output_dir="benchmark_plots"):
         """Generate visualization plots of the benchmark data."""
         if not MATPLOTLIB_AVAILABLE:
-            print("❌ Matplotlib not available. Cannot generate plots.")
+            print("[ERROR] Matplotlib not available. Cannot generate plots.")
             return
         
         if not self.timestamps:
-            print("❌ No data to plot.")
+            print("[ERROR] No data to plot.")
             return
         
         os.makedirs(output_dir, exist_ok=True)
@@ -430,7 +521,7 @@ class SystemBenchmark:
         if self.gpu_available:
             self._create_gpu_plot(times, output_dir)
         
-        print(f"📈 Plots saved to: {output_dir}/")
+        print(f"[PLOTS] Plots saved to: {output_dir}/")
     
     def _create_cpu_plot(self, times, output_dir):
         """Create CPU utilization plot."""
@@ -546,7 +637,7 @@ class SystemBenchmark:
             return
         
         print("\n" + "="*60)
-        print("🔥 LIVE OLM SYSTEM PERFORMANCE")
+        print("[LIVE] OLM SYSTEM PERFORMANCE")
         print("="*60)
         
         # Current values
@@ -554,28 +645,28 @@ class SystemBenchmark:
         ram_gb = self.data['ram_used_gb'][-1] 
         ram_pct = self.data['ram_percent'][-1]
         
-        print(f"💻 CPU Usage:     {cpu:6.1f}%")
-        print(f"🧠 RAM Usage:     {ram_gb:6.2f}GB ({ram_pct:.1f}%)")
+        print(f"CPU Usage:     {cpu:6.1f}%")
+        print(f"RAM Usage:     {ram_gb:6.2f}GB ({ram_pct:.1f}%)")
         
         if 'olm_memory_gb' in self.data:
             olm_mem = self.data['olm_memory_gb'][-1]
-            print(f"🤖 OLM Memory:    {olm_mem:6.3f}GB")
+            print(f"OLM Memory:    {olm_mem:6.3f}GB")
         
         if self.gpu_available and 'gpu_0_utilization' in self.data:
             gpu_util = self.data['gpu_0_utilization'][-1]
             gpu_mem = self.data.get('gpu_0_memory_used_gb', [0])[-1]
-            print(f"🎮 GPU Usage:     {gpu_util:6.1f}% | {gpu_mem:.2f}GB")
+            print(f"GPU Usage:     {gpu_util:6.1f}% | {gpu_mem:.2f}GB")
         
         if self.cuda_available and 'cuda_0_memory_allocated_gb' in self.data:
             cuda_mem = self.data['cuda_0_memory_allocated_gb'][-1]
-            print(f"⚡ CUDA Memory:   {cuda_mem:6.3f}GB")
+            print(f"CUDA Memory:   {cuda_mem:6.3f}GB")
         
         # Performance averages
         if len(self.data['cpu_percent']) > 60:  # Last minute average
             recent_cpu = list(self.data['cpu_percent'])[-60:]
             recent_ram = list(self.data['ram_percent'])[-60:]
             
-            print(f"\n📊 Last Minute Averages:")
+            print(f"\n[AVG] Last Minute Averages:")
             print(f"   CPU: {statistics.mean(recent_cpu):5.1f}% | RAM: {statistics.mean(recent_ram):5.1f}%")
 
 
@@ -583,7 +674,7 @@ def run_interactive_mode():
     """Run benchmark in interactive mode with live updates."""
     benchmark = SystemBenchmark(interval=1.0)
     
-    print("🎛️  Interactive Mode - Live Performance Monitoring")
+    print("[INTERACTIVE] Interactive Mode - Live Performance Monitoring")
     print("Press 's' to save results, 'p' to generate plots, 'q' to quit\n")
     
     # Start monitoring in background thread
@@ -603,7 +694,7 @@ def run_interactive_mode():
     except KeyboardInterrupt:
         benchmark.running = False
         
-    print("\n🔄 Saving final results...")
+    print("\n[SAVE] Saving final results...")
     benchmark.save_results()
     benchmark.generate_plots()
 
@@ -632,11 +723,15 @@ Examples:
                        help='Generate performance plots after monitoring')
     parser.add_argument('--interactive', action='store_true',
                        help='Run in interactive mode with live updates')
+    parser.add_argument('--no-engine', action='store_true',
+                       help='Skip auto-starting the OLM engine (monitor system only)')
+    parser.add_argument('--engine-warmup', type=int, default=5,
+                       help='Seconds to wait after starting engine before monitoring (default: 5)')
     
     args = parser.parse_args()
     
     # Header
-    print("🚀 OLM System Performance Benchmark Tool")
+    print("OLM System Performance Benchmark Tool")
     print("="*50)
     
     if args.interactive:
@@ -644,7 +739,9 @@ Examples:
         return
     
     # Standard benchmark mode
-    benchmark = SystemBenchmark(interval=args.interval)
+    start_engine = not args.no_engine
+    benchmark = SystemBenchmark(interval=args.interval, start_engine=start_engine)
+    benchmark.warmup_time = args.engine_warmup
     
     try:
         summary = benchmark.start_monitoring(duration=args.duration)
@@ -657,32 +754,32 @@ Examples:
             benchmark.generate_plots()
         
         # Print summary
-        print("\n📋 BENCHMARK SUMMARY")
+        print("\n[SUMMARY] BENCHMARK RESULTS")
         print("="*30)
         
         perf = summary.get('performance_summary', {})
         
         if 'cpu_percent' in perf:
             cpu_stats = perf['cpu_percent']
-            print(f"💻 CPU Usage:     Avg: {cpu_stats['mean']:5.1f}% | Max: {cpu_stats['max']:5.1f}%")
+            print(f"CPU Usage:     Avg: {cpu_stats['mean']:5.1f}% | Max: {cpu_stats['max']:5.1f}%")
         
         if 'ram_percent' in perf:
             ram_stats = perf['ram_percent']
-            print(f"🧠 RAM Usage:     Avg: {ram_stats['mean']:5.1f}% | Max: {ram_stats['max']:5.1f}%")
+            print(f"RAM Usage:     Avg: {ram_stats['mean']:5.1f}% | Max: {ram_stats['max']:5.1f}%")
         
         if 'olm_memory_gb' in perf:
             olm_stats = perf['olm_memory_gb']
-            print(f"🤖 OLM Memory:    Avg: {olm_stats['mean']:5.2f}GB | Max: {olm_stats['max']:5.2f}GB")
+            print(f"OLM Memory:    Avg: {olm_stats['mean']:5.2f}GB | Max: {olm_stats['max']:5.2f}GB")
         
         if 'gpu_0_utilization' in perf:
             gpu_stats = perf['gpu_0_utilization']
-            print(f"🎮 GPU Usage:     Avg: {gpu_stats['mean']:5.1f}% | Max: {gpu_stats['max']:5.1f}%")
+            print(f"GPU Usage:     Avg: {gpu_stats['mean']:5.1f}% | Max: {gpu_stats['max']:5.1f}%")
         
     except Exception as e:
-        print(f"❌ Benchmark failed: {e}")
+        print(f"[ERROR] Benchmark failed: {e}")
         return 1
     
-    print(f"\n✅ Benchmark complete! Results saved to {args.output}")
+    print(f"\n[SUCCESS] Benchmark complete! Results saved to {args.output}")
     return 0
 
 

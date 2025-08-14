@@ -2,29 +2,248 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Engine Control - Barebones</title>
-    <!-- 1. Load the required Socket.IO library -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organic Learning Machine - Engine Control</title>
+    <!-- Load Socket.IO library -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <!-- Link to external CSS file -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
-        .nav-bar {
-            background-color: #f0f0f0;
-            padding: 10px;
-            margin-bottom: 20px;
-            border-bottom: 1px solid #ccc;
+        /* Page-specific styles */
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
         }
-        .nav-bar a {
-            margin-right: 15px;
-            text-decoration: none;
-            color: #333;
-            padding: 5px 10px;
-            border-radius: 3px;
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: auto auto auto;
+            gap: 20px;
+            margin-bottom: 30px;
         }
-        .nav-bar a:hover {
-            background-color: #ddd;
+
+        .control-panel {
+            background-color: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 8px;
+            padding: 20px;
         }
-        .nav-bar a.active {
-            background-color: #007bff;
+
+        .engine-controls {
+            grid-column: 1 / -1;
+            text-align: center;
+            background: linear-gradient(135deg, #2d2d30, #252526);
+        }
+
+        .status-panel {
+            background: linear-gradient(135deg, #1e3a5f, #252526);
+        }
+
+        .stats-panel {
+            background: linear-gradient(135deg, #3d2d1e, #252526);
+        }
+
+        .logs-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .log-panel {
+            background-color: #252526;
+            border: 1px solid #3e3e42;
+            border-radius: 8px;
+            padding: 20px;
+            height: 350px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .system-log-panel {
+            border-left: 4px solid #569cd6;
+        }
+
+        .error-log-panel {
+            border-left: 4px solid #ff6b6b;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .primary-button {
+            background: linear-gradient(135deg, #569cd6, #4a8bc2);
             color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .primary-button:hover {
+            background: linear-gradient(135deg, #4a8bc2, #3d7bb5);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .danger-button {
+            background: linear-gradient(135deg, #ff6b6b, #e55a5a);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .danger-button:hover {
+            background: linear-gradient(135deg, #e55a5a, #d84848);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .status-grid {
+            display: grid;
+            gap: 15px;
+        }
+
+        .status-item {
+            background-color: #1e1e1e;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #569cd6;
+        }
+
+        .status-item.energy {
+            border-left-color: #4caf50;
+        }
+
+        .status-item.tokens {
+            border-left-color: #ff9800;
+        }
+
+        .stats-grid {
+            display: grid;
+            gap: 15px;
+        }
+
+        .stat-item {
+            background-color: #1e1e1e;
+            padding: 15px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stat-label {
+            color: #d4d4d4;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            color: #569cd6;
+            font-weight: 700;
+            font-size: 1.1em;
+        }
+
+        .log-content {
+            background-color: #1e1e1e;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: "Consolas", "Monaco", monospace;
+            font-size: 0.85em;
+            overflow-y: auto;
+            flex-grow: 1;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .nav-bar {
+            background: linear-gradient(135deg, #2d2d30, #252526);
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #3e3e42;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .nav-bar a {
+            margin-right: 20px;
+            text-decoration: none;
+            color: #d4d4d4;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .nav-bar a:hover {
+            background-color: #3e3e42;
+            color: #569cd6;
+        }
+
+        .nav-bar a.active {
+            background: linear-gradient(135deg, #569cd6, #4a8bc2);
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        h1, h2 {
+            color: #569cd6;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-weight: 300;
+        }
+
+        h1 {
+            font-size: 2.2em;
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        h2 {
+            font-size: 1.4em;
+            border-bottom: 1px solid #3e3e42;
+            padding-bottom: 8px;
+        }
+
+        @media (max-width: 1200px) {
+            .control-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .engine-controls {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .control-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .logs-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .control-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
         }
     </style>
 </head>
@@ -33,36 +252,78 @@
         <a href="/" class="active">Engine Control</a>
         <a href="/metrics">Metrics</a>
         <a href="/hashes">Hashes</a>
+        <a href="/interactive">Interactive</a>
+        <a href="/stats">Statistics</a>
         <a href="/monitor">Monitor</a>
     </div>
 
-    <h1>Engine Control</h1>
-    <button id="start-stop-button">Start Engine</button>
-    <button id="wipe-button">Wipe System Data</button>
-    <hr>
+    <div class="main-container">
+        <div class="control-grid">
+            <!-- Engine Controls -->
+            <div class="control-panel engine-controls">
+                <h1>🧠 Organic Learning Machine</h1>
+                <p style="margin-bottom: 20px; color: #b0b0b0; font-style: italic;">
+                    Autonomous AI agent with real-time learning and organic growth cycles
+                </p>
+                <div class="control-buttons">
+                    <button id="start-stop-button" class="primary-button">Start Engine</button>
+                    <button id="wipe-button" class="danger-button">Wipe System Data</button>
+                </div>
+            </div>
 
-    <h2>Live Status</h2>
-    <pre id="status-display">Engine is OFFLINE.</pre>
-    <pre id="tokens-display">Active Tokens: 0</pre>
-    <pre id="energy-display">Energy: 0.0</pre>
-    <hr>
+            <!-- Live Status Panel -->
+            <div class="control-panel status-panel">
+                <h2>🔄 Live Status</h2>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <pre id="status-display">Engine is OFFLINE.</pre>
+                    </div>
+                    <div class="status-item tokens">
+                        <pre id="tokens-display">Active Tokens: 0</pre>
+                    </div>
+                    <div class="status-item energy">
+                        <pre id="energy-display">Energy: 0.0</pre>
+                    </div>
+                </div>
+            </div>
 
-    <h2>Lifetime Stats</h2>
-    <div id="lifetime-stats-display" style="font-family: monospace;">
-        <p>Total Ticks Ever: <span id="total-ticks">0</span></p>
-        <p>Total Runtime (Hours): <span id="total-runtime">0.0</span></p>
-        <p>Session Count: <span id="session-count">0</span></p>
+            <!-- Lifetime Statistics Panel -->
+            <div class="control-panel stats-panel">
+                <h2>📊 Lifetime Statistics</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Ticks Ever:</span>
+                        <span class="stat-value" id="total-ticks">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Runtime (Hours):</span>
+                        <span class="stat-value" id="total-runtime">0.0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Session Count:</span>
+                        <span class="stat-value" id="session-count">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Container -->
+        <div class="logs-container">
+            <!-- System Log Panel -->
+            <div class="log-panel system-log-panel">
+                <h2>📝 System Log</h2>
+                <div class="log-content" id="system-log-display">Waiting for system events...</div>
+            </div>
+
+            <!-- Error Log Panel -->
+            <div class="log-panel error-log-panel">
+                <h2>⚠️ Error Log</h2>
+                <div class="log-content" id="error-log-display" style="color: #ff8a8a;">No errors detected.</div>
+            </div>
+        </div>
     </div>
-    <hr>
 
-    <h2>System Log</h2>
-    <pre id="system-log-display" style="height: 200px; overflow-y: scroll; border: 1px solid #ccc;"></pre>
-    
-    <h2>Error Log</h2>
-    <pre id="error-log-display" style="height: 200px; overflow-y: scroll; border: 1px solid #ccc; background-color: #fff0f0;"></pre>
-
-    <!-- 2. Load our custom JavaScript that will connect to the engine -->
+    <!-- Load custom JavaScript -->
     <script src="{{ url_for('static', filename='main.js') }}"></script>
-
 </body>
 </html> 

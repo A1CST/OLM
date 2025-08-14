@@ -96,22 +96,153 @@ class SensoryTokenizer:
         """Returns the number of features the tokenizer has learned to track."""
         return len(self.normalization_stats)
 
-    def decode(self, head_name, output_vector):
-        """Decodes an output vector into a human-readable format."""
+    def decode(self, head_name, output_vector, temperature=0.0):
+        """
+        Decodes an output vector into a human-readable format.
+        
+        Args:
+            head_name (str): Name of the output head
+            output_vector: The output tensor/array from the head
+            temperature (float): Temperature for sampling. 0.0 = deterministic (argmax), 
+                               higher values = more random sampling
+        """
         if not isinstance(output_vector, np.ndarray):
-            output_vector = output_vector.cpu().detach().numpy()
+            # Handle different input types
+            if hasattr(output_vector, 'cpu'):
+                # PyTorch tensor
+                output_vector = output_vector.cpu().detach().numpy()
+            elif isinstance(output_vector, list):
+                # Convert list to numpy array
+                output_vector = np.array(output_vector)
+            else:
+                # Try to convert to numpy array
+                output_vector = np.array(output_vector)
         output_vector = output_vector.flatten()
 
         if head_name == "speech":
             if not hasattr(self, 'index_char_map'):
                 self.index_char_map = {i: char for char, i in self.char_map.items()}
-            top_index = np.argmax(output_vector)
+            
+            if temperature > 0:
+                # Apply temperature to logits
+                logits = output_vector / temperature
+                # Calculate probabilities using softmax
+                exp_logits = np.exp(logits - np.max(logits))  # Subtract max for numerical stability
+                probabilities = exp_logits / np.sum(exp_logits)
+                # Sample from the distribution
+                top_index = np.random.choice(len(probabilities), p=probabilities)
+            else:
+                # Temperature of 0 means deterministic argmax
+                top_index = np.argmax(output_vector)
+            
             return self.index_char_map.get(top_index, '?')
+            
         elif head_name == "action":
-            top_index = np.argmax(output_vector)
+            if temperature > 0:
+                logits = output_vector / temperature
+                exp_logits = np.exp(logits - np.max(logits))
+                probabilities = exp_logits / np.sum(exp_logits)
+                top_index = np.random.choice(len(probabilities), p=probabilities)
+            else:
+                top_index = np.argmax(output_vector)
+            
             return self.action_map.get(top_index, 'UNKNOWN_ACTION')
+            
         elif head_name in ["video", "image", "internal_thought"]:
+            # For vector outputs, temperature doesn't apply - just show preview
             vec_preview = ", ".join([f"{x:.2f}" for x in output_vector[:4]])
-            return f"Vector({head_name}): [{vec_preview}, ...]"
+            temp_suffix = f" (T={temperature:.1f})" if temperature > 0 else ""
+            return f"Vector({head_name}): [{vec_preview}, ...]{temp_suffix}"
         else:
-            return f"Unknown head type: {head_name}" 
+            return f"Unknown head type: {head_name}"
+
+    def detokenize_internal_thought(self, thought_vector):
+        """
+        Converts internal thought vector back to sensory data format for feedback loop.
+        
+        Maps the 64-dimensional internal thought output back to the 142D sensory vector format.
+        This creates a feedback mechanism where internal thoughts influence future processing.
+        
+        Args:
+            thought_vector: numpy array or torch tensor of internal thought output (64D)
+            
+        Returns:
+            dict: sensory_info format dictionary with internal thought data
+        """
+        if not isinstance(thought_vector, np.ndarray):
+            thought_vector = thought_vector.cpu().detach().numpy()
+        thought_vector = thought_vector.flatten()
+        
+        # Ensure we have the expected 64-dimensional vector
+        if len(thought_vector) != 64:
+            # Pad or truncate to 64 dimensions
+            if len(thought_vector) < 64:
+                padded = np.zeros(64)
+                padded[:len(thought_vector)] = thought_vector
+                thought_vector = padded
+            else:
+                thought_vector = thought_vector[:64]
+        
+        # Create internal feedback data structure
+        # We'll map portions of the internal thought to different sensory modalities
+        # This creates a rich internal representation that can influence all aspects
+        
+        # Split the 64D thought vector into logical segments
+        mouse_segment = thought_vector[0:8]        # 8 values for mouse influence
+        internals_segment = thought_vector[8:12]   # 4 values for system awareness
+        vision_novelty_segment = thought_vector[12:48]  # 36 values for visual influence
+        vision_static_segment = thought_vector[48:64]   # 16 values for visual memory
+        
+        # Create sensory data structure with internal thought influence
+        internal_sensory_data = {
+            'mouse': {
+                # Map internal thoughts to subtle mouse influences
+                'x': float(mouse_segment[0] * 100),  # Small positional bias
+                'y': float(mouse_segment[1] * 100),
+                'delta': abs(float(mouse_segment[2] * 10)),  # Movement influence
+                'scroll': float(mouse_segment[3] * 2),
+                'left_single_click': max(0.0, float(mouse_segment[4])),
+                'right_single_click': max(0.0, float(mouse_segment[5])),
+                'left_hold': max(0.0, float(mouse_segment[6])),
+                'internal_thought_influence': True  # Flag to identify this as internal
+            },
+            
+            'internals': {
+                # Map internal thoughts to system awareness
+                'cpu_percent': abs(float(internals_segment[0] * 20)),
+                'memory_percent': abs(float(internals_segment[1] * 20)),
+                'gpu_load': abs(float(internals_segment[2] * 20)),
+                'temperature_c': abs(float(internals_segment[3] * 10)),
+                'internal_thought_influence': True
+            },
+            
+            'vision': {
+                # Map internal thoughts to visual processing influence
+                'visual_novelty_vector': np.concatenate([
+                    vision_novelty_segment * 0.1,  # Use our 36 values  
+                    np.zeros(28)  # Pad to 64 total for compatibility
+                ]),
+                'static_latent_vector': np.concatenate([
+                    vision_static_segment * 0.1,  # Use our 16 values
+                    np.zeros(48)  # Pad to 64 total for compatibility
+                ]),
+                'internal_thought_influence': True,
+                'original_thought_vector': thought_vector  # Keep original for analysis
+            },
+            
+            # Add metadata about this internal thought
+            '_internal_thought_metadata': {
+                'source': 'internal_thought_head',
+                'vector_norm': float(np.linalg.norm(thought_vector)),
+                'max_activation': float(np.max(np.abs(thought_vector))),
+                'active_dimensions': int(np.sum(np.abs(thought_vector) > 0.01)),
+                'timestamp': self._get_current_timestamp()
+            }
+        }
+        
+        return internal_sensory_data
+    
+    def _get_current_timestamp(self):
+        """Helper to get current timestamp for internal thought tracking."""
+        import time
+        return time.time() 

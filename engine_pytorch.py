@@ -13,6 +13,7 @@ from collections import deque
 from PIL import Image
 import base64
 from io import BytesIO
+from replay_buffer import ReplayBuffer
 import torchvision.transforms as T
 
 # Import the PyTorch models you created
@@ -93,7 +94,7 @@ class EngineCore(threading.Thread):
 
         # --- UPDATE THIS DICTIONARY ---
         head_configs = {
-            "internal_thought": {"hidden_size": 64, "max_depth": 16}, # No specific output size
+            "internal_thought": {"hidden_size": 64, "max_depth": 16, "output_size": 64}, # 64D output for detokenization
             "speech": {"hidden_size": 64, "max_depth": 16, "output_size": speech_vocab_size},
             "video": {"hidden_size": 64, "max_depth": 16, "output_size": latent_vector_size},
             "image": {"hidden_size": 64, "max_depth": 16, "output_size": latent_vector_size},
@@ -137,8 +138,24 @@ class EngineCore(threading.Thread):
         # --- ADD THESE LINES ---
         # State machine attributes
         self.agent_state = "AWAKE" # Start in the AWAKE state
-        self.ticks_spent_awake = 0
+        
+        # --- ADD THIS BLOCK ---
+        # Initialize stateful energy and boredom
+        # Energy starts at the cap defined by the brand new "baby" regulator
+        self.current_energy = self.regulator.energy_cap
+        self.current_boredom = 0.5 # Start at a neutral boredom level
         # --- END OF BLOCK ---
+        
+        self.ticks_spent_awake = 0
+        self.thought_count_this_cycle = 0  # Track internal thoughts for dream quota
+        
+        # --- Internal Thought Feedback Loop ---
+        self.internal_thought_feedback = None  # Will hold detokenized internal thought from previous tick
+        self.internal_thought_history = []     # Keep history for analysis
+        self.max_thought_history = 10          # Limit memory usage
+        
+        # --- Replay Buffer for Dreams ---
+        self.replay_buffer = ReplayBuffer(max_size=10000)  # Store experiences for dreaming
         
         self.tick_count = 0
         self.start_time = None
@@ -206,25 +223,11 @@ class EngineCore(threading.Thread):
 
     def get_energy(self):
         """Returns the current energy level of the agent (0.0 to 1.0)."""
-        # Simple energy model: starts at 1.0 and decreases with processing
-        # Energy recovers over time when not processing heavily
-        base_energy = 1.0
-        processing_penalty = len(self.head_novelty_scores) * 0.01  # Small penalty per active head
-        time_recovery = min(1.0, (time.time() - self.start_time) * 0.001)  # Gradual recovery
-        
-        energy = max(0.1, base_energy - processing_penalty + time_recovery)
-        return energy
+        return self.current_energy
 
     def get_boredom(self):
         """Returns the current boredom level of the agent (0.0 to 1.0)."""
-        # Boredom increases when the same patterns are repeated
-        # It decreases when novel patterns are encountered
-        base_boredom = 0.5
-        novelty_factor = 1.0 - (len(self.hasher.master_hash_data) / 100.0)  # Less novelty as more patterns are learned
-        repetition_penalty = 0.1  # Small penalty for repeated patterns
-        
-        boredom = min(1.0, base_boredom + novelty_factor + repetition_penalty)
-        return boredom
+        return self.current_boredom
 
     def _start_components(self):
         """Start all enabled components."""
@@ -627,26 +630,29 @@ class EngineCore(threading.Thread):
                     self._tick_cycle()
                 
                 elif self.agent_state == "SLEEPING":
-                    # --- SLEEP CYCLE PLACEHOLDER ---
-                    # This is where the training logic will go.
-                    # For now, we simulate sleep and then wake up.
-                    self.log(f"Agent state is now SLEEPING. Pausing for {self.regulator.sleep_duration_ticks / 20.0:.1f}s...")
+                    self.log("Agent is falling asleep...")
                     
-                    # Calculate average novelty from the last awake cycle
-                    # This is a simple placeholder - in a full implementation, this would
-                    # be calculated from stored experiences during the awake period
+                    # 1. Calculate the number of dreams for this sleep cycle
+                    dream_count = self.regulator.calculate_dream_count(self.thought_count_this_cycle)
+                    self.log(f"Dream quota: {self.thought_count_this_cycle} thoughts -> {dream_count} dreams")
+                    
+                    # 2. Run the actual sleep/dream cycle
+                    self._sleep_cycle(dream_count)
+                    
+                    # 3. Calculate average novelty from the last awake cycle and update growth
                     avg_novelty_scores = list(self.head_novelty_scores.values())
                     novelty_average = sum(avg_novelty_scores) / len(avg_novelty_scores) if avg_novelty_scores else 0.5
-                    
-                    # Update growth stage based on novelty experienced
                     self.regulator.update_growth_stage(novelty_average)
-                    
-                    # TODO: Implement the _sleep_cycle() method with ReplayBuffer and training.
-                    time.sleep(self.regulator.sleep_duration_ticks * target_interval) # Use regulator's sleep duration
+
+                    # 4. Replenish energy and reset counters for waking up
+                    self.current_energy = 1.0  # Always reset to 100% energy during sleep
+                    self.current_boredom = 0.0 # Wake up refreshed and not bored
+                    self.log(f"Energy replenished to {self.current_energy:.2f}. Boredom reset.")
                     
                     self.log("...waking up.")
                     self.agent_state = "AWAKE"
                     self.ticks_spent_awake = 0 # Reset the awake counter
+                    self.thought_count_this_cycle = 0 # Reset for the next cycle
             
             except Exception as e:
                 self.log(f"CRITICAL ERROR in main run loop: {str(e)}")
@@ -655,6 +661,124 @@ class EngineCore(threading.Thread):
                 self.is_running = False
         
         self.log("Engine loop has terminated.")
+
+    def _sleep_cycle(self, dream_count):
+        """
+        Performs the dreaming and training process during sleep.
+        
+        Args:
+            dream_count (int): Number of dream iterations to perform
+        """
+        self.log(f"Entering dreamstate. Processing {dream_count} thoughts...")
+        
+        if self.replay_buffer.is_empty():
+            self.log("Replay buffer is empty. Cannot dream.")
+            return
+
+        buffer_stats = self.replay_buffer.get_stats()
+        self.log(f"Dream stats: {buffer_stats['size']} experiences, {buffer_stats['novel_count']} novel, avg novelty {buffer_stats['avg_novelty_score']:.3f}")
+
+        for i in range(dream_count):
+            # Sample memories using different strategies
+            if i % 3 == 0:
+                # Every 3rd dream: focus on novel experiences
+                experiences = self.replay_buffer.sample_novel(1)
+                dream_type = "novel"
+            elif i % 3 == 1:
+                # Every 3rd dream: use recent experiences
+                experiences = self.replay_buffer.sample_recent(1)
+                dream_type = "recent"
+            else:
+                # Otherwise: random sampling
+                experiences = self.replay_buffer.sample(1)
+                dream_type = "random"
+            
+            if not experiences:
+                continue
+            
+            experience = experiences[0]
+            token_vector = experience['token_vector']
+            hash_result = experience['hash_result']
+            required_depths = experience['required_depths']
+            
+            self.log(f"  Dream {i+1}/{dream_count} ({dream_type}): {hash_result.get('status', 'unknown')} experience")
+
+            # Run a dream forward pass (NO GRADIENTS YET)
+            with torch.no_grad():
+                try:
+                    # Convert token vector to tensor
+                    input_tensor = torch.from_numpy(token_vector).float().to(self.device)
+                    input_tensor = input_tensor.view(1, 1, -1)  # Add batch and sequence dimensions
+                    
+                    # In dreams, ONLY the internal_thought head is active
+                    dream_heads = ['internal_thought']
+                    
+                    # Use cached trunk output if available
+                    if hash_result.get('status') == 'master' and 'trunk_output' in self.hasher.master_hash_data.get(hash_result['hash'], {}):
+                        # Use cached trunk output
+                        trunk_output = self.hasher.master_hash_data[hash_result['hash']]['trunk_output']
+                        # --- FIX IS HERE: Convert the list back to a NumPy array ---
+                        trunk_output_tensor = torch.from_numpy(np.array(trunk_output)).float().to(self.device)
+                        trunk_output_tensor = trunk_output_tensor.view(1, 1, -1)
+                        d_lstm_input = trunk_output_tensor
+                    else:
+                        # Run trunk LSTM for this dream (pattern + compression)
+                        p_out, p_states = self.pipeline.pattern_lstm(input_tensor, self.pipeline_states['pattern'])
+                        c_out, c_states = self.pipeline.compression_lstm(p_out, self.pipeline_states['compression'])
+                        
+                        # Update trunk states
+                        self.pipeline_states['pattern'] = p_states
+                        self.pipeline_states['compression'] = c_states
+                        d_lstm_input = c_out
+                    
+                    # Process only internal_thought head
+                    for head_name in dream_heads:
+                        if head_name in self.pipeline.output_heads:
+                            head_states = self.pipeline_states['heads'][head_name]
+                            required_depth = required_depths.get(head_name, 8)  # Lower depth for dreams
+                            
+                            # Run the head with dream-like processing using correct DLSTM interface
+                            head_network = self.pipeline.output_heads[head_name]
+                            h_list, c_list = head_network(
+                                d_lstm_input,
+                                head_states['h'],
+                                head_states['c'], 
+                                required_depth
+                            )
+                            
+                            # Update states for next dream (maintain continuity)
+                            self.pipeline_states['heads'][head_name] = {'h': h_list, 'c': c_list}
+                            
+                            # Get the final feature vector from the correct depth (like in normal tick cycle)
+                            final_feature_vector = h_list[required_depth - 1].squeeze(0).squeeze(0)
+                            
+                            # Pass it through the final output layer if it exists
+                            if head_name in self.pipeline.output_layers:
+                                head_output = self.pipeline.output_layers[head_name](final_feature_vector)
+                            else:
+                                head_output = final_feature_vector
+                            
+                            # Debug: Check the actual types before decode
+                            self.log(f"    Debug: head_output type = {type(head_output)}")
+                            if hasattr(head_output, 'shape'):
+                                self.log(f"    Debug: head_output shape = {head_output.shape}")
+                            if isinstance(head_output, list):
+                                self.log(f"    Debug: head_output is list with {len(head_output)} items")
+                                if len(head_output) > 0:
+                                    self.log(f"    Debug: first item type = {type(head_output[0])}")
+                            
+                            # Decode output with high temperature for dream-like randomness
+                            decoded_output = self.tokenizer.decode(head_name, head_output, temperature=1.5)
+                            self.log(f"    Dream output: {decoded_output}")
+                            
+                except Exception as e:
+                    self.log(f"    Dream error: {str(e)}")
+                    continue
+
+            # Brief pause to simulate processing time
+            time.sleep(0.01)  # 10ms pause between dreams
+        
+        self.log("Dreamstate complete.")
 
     def _tick_cycle(self):
         """Performs one cycle of the internal engine."""
@@ -692,7 +816,50 @@ class EngineCore(threading.Thread):
                 static_latent_vector = self.previous_latent_vector.cpu().numpy().flatten()
                 self.sensory_info['vision']['static_latent_vector'] = static_latent_vector
 
-            # --- 1. Real Sensory Data & Tokenization ---
+            # --- 1. Internal Thought Feedback Integration ---
+            # Before processing sensory data, integrate internal thought from previous tick
+            if self.internal_thought_feedback is not None:
+                self.log(f"FEEDBACK LOOP: Integrating internal thought from previous tick")
+                
+                # Merge internal thought feedback with current sensory data
+                for modality, feedback_data in self.internal_thought_feedback.items():
+                    if modality.startswith('_'):  # Skip metadata
+                        continue
+                        
+                    if modality not in self.sensory_info:
+                        self.sensory_info[modality] = {}
+                    
+                    # Blend internal thoughts with real sensory data
+                    for key, value in feedback_data.items():
+                        if key == 'internal_thought_influence':
+                            continue  # Skip flag
+                        
+                        # If real sensory data exists, blend it with internal thought
+                        if key in self.sensory_info[modality]:
+                            if isinstance(value, (int, float)):
+                                # Weighted blend: 70% real data, 30% internal thought
+                                self.sensory_info[modality][key] = (
+                                    0.7 * self.sensory_info[modality][key] + 
+                                    0.3 * value
+                                )
+                            elif isinstance(value, np.ndarray):
+                                # For arrays, add scaled internal influence
+                                self.sensory_info[modality][key] = (
+                                    0.7 * self.sensory_info[modality][key] + 
+                                    0.3 * value
+                                )
+                        else:
+                            # If no real data, use internal thought directly (scaled down)
+                            if isinstance(value, (int, float)):
+                                self.sensory_info[modality][key] = 0.2 * value
+                            elif isinstance(value, np.ndarray):
+                                self.sensory_info[modality][key] = 0.2 * value
+                
+                # Add feedback metadata to sensory info for tracking
+                self.sensory_info['_internal_feedback_active'] = True
+                self.sensory_info['_feedback_metadata'] = self.internal_thought_feedback.get('_internal_thought_metadata', {})
+            
+            # --- 2. Real Sensory Data & Tokenization ---
             # Use the real sensory data collected from components
             # If no real data is available, fall back to simulated data
             if not self.sensory_info:
@@ -704,7 +871,7 @@ class EngineCore(threading.Thread):
                     }
                 }
             
-            # Use the tokenizer to process the real sensory data
+            # Use the tokenizer to process the real sensory data (now including internal thought feedback)
             token_vector_np = self.tokenizer.tokenize(self.sensory_info)
 
             # --- VECTOR AUTOPSY: Diagnostic logging every 20 ticks ---
@@ -777,6 +944,10 @@ class EngineCore(threading.Thread):
                 # --- B: Action Selection (for the CURRENT tick) ---
                 active_heads = self.action_selector.select_actions(self, self.head_novelty_scores)
                 self.log(f"Active Heads ({len(active_heads)}): {', '.join(active_heads)}")
+                
+                # --- Track internal thoughts for dream quota ---
+                if 'internal_thought' in active_heads:
+                    self.thought_count_this_cycle += 1
                 
                 d_lstm_input = None # This will hold the input for the D-LSTM heads
                 
@@ -856,6 +1027,37 @@ class EngineCore(threading.Thread):
                     'active_heads': active_heads,
                     'novelty_before': current_novelty_score
                 })
+
+            # --- [NEW] ENERGY & BOREDOM CALCULATION ---
+            # 1. Calculate Energy Consumption for this tick
+            energy_cost_this_tick = 0.0
+            cost_per_depth_unit = 0.0001 # Hyperparameter to tune
+            for head_name in active_heads:
+                base_cost = self.action_selector.head_energy_costs.get(head_name, 0.01)
+                depth = required_depths.get(head_name, 16)
+                energy_cost_this_tick += base_cost + (depth * cost_per_depth_unit)
+            
+            # Deplete energy, ensuring it doesn't go below zero
+            self.current_energy = max(0.0, self.current_energy - energy_cost_this_tick)
+
+            # 2. Update Boredom
+            # Boredom slowly increases every tick, but drops significantly on a novel tick
+            novelty_impact = 0.5 # Hyperparameter
+            if hash_result['status'] == 'novel':
+                self.current_boredom = max(0.0, self.current_boredom - novelty_impact)
+            else:
+                self.current_boredom = min(1.0, self.current_boredom + 0.001) # Slow increase
+
+            # 3. Store experience in replay buffer for dreaming
+            self.replay_buffer.add_experience(
+                token_vector=token_vector_np,
+                hash_result=hash_result,
+                required_depths=required_depths,
+                active_heads=active_heads,
+                novelty_scores=self.head_novelty_scores.copy()
+            )
+
+            # The rest of the _tick_cycle method (TPS calculation, GUI updates) remains outside this block
             
             # CRITICAL: We no longer need the monolithic call to self.pipeline(...)
             # The logic above has replaced it.
@@ -891,6 +1093,32 @@ class EngineCore(threading.Thread):
                     decoded_string = self.tokenizer.decode(head_name, output_tensor)
                     decoded_outputs[head_name] = decoded_string
 
+            # --- INTERNAL THOUGHT FEEDBACK LOOP PROCESSING ---
+            # Process internal thought output for next tick's feedback
+            if 'internal_thought' in final_outputs:
+                with torch.no_grad():
+                    internal_thought_vector = final_outputs['internal_thought']
+                    
+                    # Detokenize internal thought back to sensory data format
+                    self.internal_thought_feedback = self.tokenizer.detokenize_internal_thought(internal_thought_vector)
+                    
+                    # Add to history for analysis (limit memory usage)
+                    thought_record = {
+                        'tick': self.tick_count,
+                        'vector': internal_thought_vector.cpu().numpy().copy(),
+                        'metadata': self.internal_thought_feedback.get('_internal_thought_metadata', {})
+                    }
+                    self.internal_thought_history.append(thought_record)
+                    
+                    # Limit history size
+                    if len(self.internal_thought_history) > self.max_thought_history:
+                        self.internal_thought_history.pop(0)
+                    
+                    self.log(f"INTERNAL THOUGHT: Prepared feedback for next tick (norm: {thought_record['metadata'].get('vector_norm', 0):.3f})")
+            else:
+                # No internal thought this tick, clear feedback
+                self.internal_thought_feedback = None
+
             # B. Determine agent's high-level status
             current_energy = self.get_energy()
             current_boredom = self.get_boredom()
@@ -920,6 +1148,13 @@ class EngineCore(threading.Thread):
                 'novelty_scores': {k: round(v, 3) for k, v in self.head_novelty_scores.items()},
                 'agent_status': agent_status,
                 'decoded_outputs': decoded_outputs, # NEW: Add the full decoded output dictionary
+                
+                # --- ADD MISSING FIELDS FOR METRICS ---
+                'growth_stage': round(self.regulator.growth_stage, 3),
+                'processing_depth': max([required_depths.get(head, 4) for head in active_heads] + [4]),
+                'agent_state': self.agent_state,
+                'ticks_spent_awake': self.ticks_spent_awake,
+                'thought_count_this_cycle': self.thought_count_this_cycle,
                 
                 # --- MODIFIED LINES ---
                 'display_image_b64': vision_data.get('display_image_b64'),
@@ -987,7 +1222,14 @@ class EngineCore(threading.Thread):
                 'active_heads': ['internal_thought'],  # Fallback to just internal thought on error
                 'energy': round(self.get_energy(), 2),
                 'boredom': round(self.get_boredom(), 2),
-                'novelty_scores': {k: round(v, 2) for k, v in self.head_novelty_scores.items()}
+                'novelty_scores': {k: round(v, 2) for k, v in self.head_novelty_scores.items()},
+                
+                # --- ADD MISSING FIELDS FOR METRICS (ERROR CASE) ---
+                'growth_stage': round(self.regulator.growth_stage, 3),
+                'processing_depth': 4,  # Default fallback depth on error
+                'agent_state': self.agent_state,
+                'ticks_spent_awake': self.ticks_spent_awake,
+                'thought_count_this_cycle': getattr(self, 'thought_count_this_cycle', 0)
             }
             
             # Put the error status update in the queue using non-blocking approach

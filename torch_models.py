@@ -99,12 +99,6 @@ class DLSTM_Network(nn.Module):
             # The output is already the correct 3D shape.
             current_input = output
             
-            # --- Replicate the critical normalization step ---
-            # This works on the 3D tensor just fine.
-            norm = torch.linalg.norm(current_input)
-            if norm > 0:
-                current_input = current_input / (norm + 1e-8)
-            
         return h_next_list, c_next_list
 
 

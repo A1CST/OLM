@@ -9,9 +9,12 @@ class ActionSelector:
         # Calculate a base energy cost for running each head,
         # proportional to its complexity (hidden_size).
         self.head_energy_costs = {}
-        cost_per_neuron = 0.01 # Hyperparameter to tune
+        cost_per_neuron = 0.0001 # Hyperparameter to tune
         for name, config in head_configs.items():
             self.head_energy_costs[name] = config['hidden_size'] * cost_per_neuron
+        
+        # Override specific head costs for better balance
+        self.head_energy_costs['internal_thought'] = 0.03  # Much lower cost for internal thoughts
 
     def select_actions(self, olm_agent, head_novelty_scores):
         """

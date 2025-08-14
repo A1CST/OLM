@@ -1,0 +1,14 @@
+{
+    "total_ticks_ever": 215,
+    "total_runtime_seconds": 157.90263748168945,
+    "session_count": 1,
+    "sessions": [
+        {
+            "session_id": 1,
+            "start_time_utc": "2025-08-14T18:00:30.136259",
+            "stop_time_utc": "2025-08-14T18:03:08.038896",
+            "duration_seconds": 157.9,
+            "ticks_in_session": 215
+        }
+    ]
+}

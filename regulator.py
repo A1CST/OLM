@@ -36,8 +36,8 @@ class Regulator:
         # Awake Duration: Stays awake longer as it matures. (e.g., from ~1 min to 10+ mins)
         self.awake_duration_ticks = int(1200 + self.growth_stage * 500) # 20 TPS * 60s = 1200
         
-        # Sleep Duration: Sleeps for shorter periods as it becomes more efficient.
-        self.sleep_duration_ticks = int(max(500, 2000 - self.growth_stage * 100))
+        # Sleep Duration: Now dynamic based on dream count (calculated per sleep cycle)
+        # This is no longer a fixed duration but depends on thoughts during awake cycle
         
         # Training Sample Size: Learns from more memories as it grows.
         self.training_sample_size = int(100 + self.growth_stage * 50)
@@ -78,4 +78,22 @@ class Regulator:
             
         # Default State: If none of the above, remain awake.
         self.is_crying = False
-        return "AWAKE" 
+        return "AWAKE"
+
+    def calculate_dream_count(self, thought_count):
+        """
+        Calculates the number of dreams to process during sleep,
+        scaled by the agent's growth stage.
+        
+        Args:
+            thought_count (int): Number of internal thoughts during the awake cycle
+            
+        Returns:
+            int: Number of dream iterations to perform
+        """
+        # A more mature agent can process more thoughts per sleep cycle
+        dream_factor = 0.5 + (self.growth_stage * 0.1)  # Hyperparameter
+        dream_count = int(thought_count * dream_factor)+100
+        
+        # Ensure we have at least 1 dream and cap at reasonable maximum
+        return max(1, min(dream_count, 100)) 

@@ -1,0 +1,292 @@
+{
+    "normalization_stats": {
+        "mouse_x": {
+            "min": 0.0,
+            "max": 2058.441986250877
+        },
+        "mouse_y": {
+            "min": -5.237119888843874,
+            "max": 521.3288806915283
+        },
+        "mouse_delta": {
+            "min": 0.0,
+            "max": 615.6026549725532
+        },
+        "mouse_scroll": {
+            "min": -0.0046754516661167145,
+            "max": 0.016907048082737047
+        },
+        "cpu_percent": {
+            "min": 0.0,
+            "max": 11.96758153438568
+        },
+        "memory_percent": {
+            "min": 0.0,
+            "max": 41.76707909584045
+        },
+        "gpu_load": {
+            "min": 0.0,
+            "max": 7.8586548268795005
+        },
+        "temperature_c": {
+            "min": 0.0,
+            "max": 0.758416985882292
+        },
+        "static_latent_0": {
+            "min": -0.0006328755524009467,
+            "max": 0.0
+        },
+        "static_latent_1": {
+            "min": 0.0,
+            "max": 0.0008609214797616005
+        },
+        "static_latent_2": {
+            "min": 0.0,
+            "max": 0.002921118773519993
+        },
+        "static_latent_3": {
+            "min": -0.00121941389515996,
+            "max": 0.0
+        },
+        "static_latent_4": {
+            "min": -0.0006787158548831941,
+            "max": 0.0
+        },
+        "static_latent_5": {
+            "min": -4.347994981799275e-05,
+            "max": 0.00032724135089665655
+        },
+        "static_latent_6": {
+            "min": 0.0,
+            "max": 0.0015522983856499197
+        },
+        "static_latent_7": {
+            "min": 0.0,
+            "max": 0.0005658554378896952
+        },
+        "static_latent_8": {
+            "min": 0.0,
+            "max": 0.0011545921675860883
+        },
+        "static_latent_9": {
+            "min": -0.002087775804102421,
+            "max": 0.0
+        },
+        "static_latent_10": {
+            "min": -0.0014200634323060513,
+            "max": 0.0
+        },
+        "static_latent_11": {
+            "min": 0.0,
+            "max": 0.002788396738469601
+        },
+        "static_latent_12": {
+            "min": 0.0,
+            "max": 0.0010005376301705838
+        },
+        "static_latent_13": {
+            "min": -0.0006531674414873124,
+            "max": 0.0
+        },
+        "static_latent_14": {
+            "min": 0.0,
+            "max": 0.0013582035899162292
+        },
+        "static_latent_15": {
+            "min": 0.0,
+            "max": 0.0008694444783031941
+        },
+        "static_latent_16": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_17": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_18": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_19": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_20": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_21": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_22": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_23": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_24": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_25": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_26": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_27": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_28": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_29": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_30": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_31": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_32": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_33": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_34": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_35": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_36": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_37": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_38": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_39": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_40": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_41": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_42": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_43": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_44": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_45": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_46": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_47": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_48": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_49": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_50": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_51": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_52": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_53": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_54": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_55": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_56": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_57": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_58": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_59": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_60": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_61": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_62": {
+            "min": 0.0,
+            "max": 0.0
+        },
+        "static_latent_63": {
+            "min": 0.0,
+            "max": 0.0
+        }
+    }
+}
